@@ -38,6 +38,15 @@
       </div>
 
       <div class="form-item">
+        <label class="label">省份</label>
+        <select v-model="form.province" class="input select">
+          <option value="" disabled>请选择省份</option>
+          <option v-for="p in provinces" :key="p" :value="p">{{ p }}</option>
+        </select>
+        <div v-if="errors.province" class="error">{{ errors.province }}</div>
+      </div>
+
+      <div class="form-item">
         <label class="label">活动档位</label>
         <div class="type-group">
           <div
@@ -73,9 +82,18 @@ const typeOptions = [
   { id: 'A300', label: '满300送100' }
 ]
 
+const provinces = [
+  '北京', '天津', '河北', '山西', '内蒙古', '辽宁', '吉林', '黑龙江',
+  '上海', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南',
+  '湖北', '湖南', '广东', '广西', '海南', '重庆', '四川', '贵州',
+  '云南', '西藏', '陕西', '甘肃', '青海', '宁夏', '新疆',
+  '香港', '澳门', '台湾'
+]
+
 const form = reactive({
   name: '',
   phone: '',
+  province: '',
   activityType: props.activityType
 })
 
@@ -83,7 +101,7 @@ watch(() => props.activityType, v => {
   if (!success.value) form.activityType = v
 })
 
-const errors = reactive({ name: '', phone: '', activityType: '' })
+const errors = reactive({ name: '', phone: '', province: '', activityType: '' })
 const submitting = ref(false)
 const serverError = ref('')
 const success = ref(false)
@@ -92,8 +110,9 @@ const successLabel = ref('')
 function validate() {
   errors.name = form.name ? '' : '请输入姓名'
   errors.phone = /^1[3-9]\d{9}$/.test(form.phone) ? '' : '请输入正确的11位手机号'
+  errors.province = provinces.includes(form.province) ? '' : '请选择省份'
   errors.activityType = ['A200', 'A300'].includes(form.activityType) ? '' : '请选择活动档位'
-  return !errors.name && !errors.phone && !errors.activityType
+  return !errors.name && !errors.phone && !errors.province && !errors.activityType
 }
 
 async function submit() {
@@ -107,6 +126,7 @@ async function submit() {
       body: JSON.stringify({
         name: form.name,
         phone: form.phone,
+        province: form.province,
         activityType: form.activityType
       })
     })
@@ -117,6 +137,7 @@ async function submit() {
     } else if (data.errors) {
       if (data.errors.name) errors.name = data.errors.name
       if (data.errors.phone) errors.phone = data.errors.phone
+      if (data.errors.province) errors.province = data.errors.province
       if (data.errors.activityType) errors.activityType = data.errors.activityType
     } else {
       serverError.value = data.message || '报名失败，请稍后重试'
@@ -166,6 +187,19 @@ function reset() {
 }
 
 .input::placeholder {
+  color: #c9b8a3;
+}
+
+.select {
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b39b83' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-color: #fff;
+}
+
+.select:invalid {
   color: #c9b8a3;
 }
 
