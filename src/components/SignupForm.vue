@@ -2,68 +2,50 @@
   <div class="section" id="signup">
     <div class="section-title">立即报名 · 锁定优惠</div>
 
-    <div v-if="success" class="success-box">
+    <div v-if="mySignup" class="success-box">
       <div class="success-icon">🎉</div>
-      <div class="success-title">报名成功！</div>
-      <div class="success-desc">
-        您已成功报名「{{ successLabel }}」活动<br>凭报名手机号到店即可参与
+      <div class="success-title">您已报名成功</div>
+      <div class="voucher">
+        <div class="voucher-row"><span>报名 ID</span><b>#{{ mySignup.id }}</b></div>
+        <div class="voucher-row">
+          <span>优惠档位</span><b>满{{ mySignup.threshold }}送{{ mySignup.bonus }}</b>
+        </div>
+        <div class="voucher-row"><span>核销手机号</span><b>{{ mySignup.contact_phone }}</b></div>
+        <div class="voucher-row"><span>报名时间</span><b>{{ formatDateTime(mySignup.created_at) }}</b></div>
+        <div class="voucher-row">
+          <span>状态</span>
+          <b :class="mySignup.status === 'redeemed' ? 'status-done' : 'status-pending'">
+            {{ mySignup.status === 'redeemed' ? '已核销' : '待核销' }}
+          </b>
+        </div>
       </div>
-      <button class="again-btn" @click="reset">再帮朋友报一个</button>
+      <router-link class="again-btn" to="/my">查看我的报名</router-link>
     </div>
 
     <form v-else class="form" @submit.prevent="submit">
       <div class="form-item">
-        <label class="label">姓名</label>
-        <input
-          v-model.trim="form.name"
-          class="input"
-          type="text"
-          maxlength="20"
-          placeholder="请输入您的姓名"
-        >
-        <div v-if="errors.name" class="error">{{ errors.name }}</div>
+        <label class="label">联系人姓名</label>
+        <input v-model.trim="form.contact_name" class="input" type="text" maxlength="20" placeholder="请输入您的姓名">
+        <div v-if="errors.contact_name" class="error">{{ errors.contact_name }}</div>
       </div>
 
       <div class="form-item">
-        <label class="label">手机号</label>
+        <label class="label">核销手机号</label>
         <input
-          v-model.trim="form.phone"
+          v-model.trim="form.contact_phone"
           class="input"
           type="tel"
           maxlength="11"
-          placeholder="请输入11位手机号"
-          @input="form.phone = form.phone.replace(/\D/g, '')"
+          placeholder="请输入 11 位手机号"
+          @input="form.contact_phone = form.contact_phone.replace(/\D/g, '')"
         >
-        <div v-if="errors.phone" class="error">{{ errors.phone }}</div>
-      </div>
-
-      <div class="form-item">
-        <label class="label">省份</label>
-        <select v-model="form.province" class="input select">
-          <option value="" disabled>请选择省份</option>
-          <option v-for="p in provinces" :key="p" :value="p">{{ p }}</option>
-        </select>
-        <div v-if="errors.province" class="error">{{ errors.province }}</div>
-      </div>
-
-      <div class="form-item">
-        <label class="label">活动档位</label>
-        <div class="type-group">
-          <div
-            v-for="t in typeOptions"
-            :key="t.id"
-            class="type-item"
-            :class="{ active: form.activityType === t.id }"
-            @click="form.activityType = t.id"
-          >{{ t.label }}</div>
-        </div>
-        <div v-if="errors.activityType" class="error">{{ errors.activityType }}</div>
+        <div v-if="errors.contact_phone" class="error">{{ errors.contact_phone }}</div>
       </div>
 
       <div v-if="serverError" class="server-error">{{ serverError }}</div>
 
-      <button class="submit-btn" type="submit" :disabled="submitting">
-        {{ submitting ? '提交中...' : '立即报名' }}
+      <button class="submit-btn" type="submit" :disabled="submitting || activityEnded">
+        {{ submitLabel }}
       </button>
       <p class="agree-tip">报名即表示同意活动规则，手机号仅用于本次活动核销</p>
     </form>
@@ -71,96 +53,68 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, computed } from 'vue'
+import request from '../utils/request'
+import { formatDateTime } from '../utils/format'
 
 const props = defineProps({
-  activityType: { type: String, required: true }
+  tierId: { type: Number, default: null },
+  activityEnded: { type: Boolean, default: false },
+  mySignup: { type: Object, default: null },
+  isLoggedIn: { type: Boolean, default: false }
 })
+const emit = defineEmits(['success', 'require-auth'])
 
-const typeOptions = [
-  { id: 'A200', label: '满200送50' },
-  { id: 'A300', label: '满300送100' }
-]
-
-const provinces = [
-  '北京', '天津', '河北', '山西', '内蒙古', '辽宁', '吉林', '黑龙江',
-  '上海', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南',
-  '湖北', '湖南', '广东', '广西', '海南', '重庆', '四川', '贵州',
-  '云南', '西藏', '陕西', '甘肃', '青海', '宁夏', '新疆',
-  '香港', '澳门', '台湾'
-]
-
-const form = reactive({
-  name: '',
-  phone: '',
-  province: '',
-  activityType: props.activityType
-})
-
-watch(() => props.activityType, v => {
-  if (!success.value) form.activityType = v
-})
-
-const errors = reactive({ name: '', phone: '', province: '', activityType: '' })
+const form = reactive({ contact_name: '', contact_phone: '' })
+const errors = reactive({ contact_name: '', contact_phone: '' })
 const submitting = ref(false)
 const serverError = ref('')
-const success = ref(false)
-const successLabel = ref('')
+
+const submitLabel = computed(() => {
+  if (props.activityEnded) return '活动已结束'
+  if (submitting.value) return '提交中...'
+  return '立即报名'
+})
 
 function validate() {
-  errors.name = form.name ? '' : '请输入姓名'
-  errors.phone = /^1[3-9]\d{9}$/.test(form.phone) ? '' : '请输入正确的11位手机号'
-  errors.province = provinces.includes(form.province) ? '' : '请选择省份'
-  errors.activityType = ['A200', 'A300'].includes(form.activityType) ? '' : '请选择活动档位'
-  return !errors.name && !errors.phone && !errors.province && !errors.activityType
+  errors.contact_name = form.contact_name ? '' : '请输入联系人姓名'
+  errors.contact_phone = /^1[3-9]\d{9}$/.test(form.contact_phone) ? '' : '请输入正确的 11 位手机号'
+  return !errors.contact_name && !errors.contact_phone
 }
 
 async function submit() {
   serverError.value = ''
+  if (!props.tierId) {
+    serverError.value = '请先选择优惠档位'
+    return
+  }
   if (!validate()) return
+  // 提交中禁用按钮防重复点击，服务端唯一索引兜底并发重复（AC-6/8）。
   submitting.value = true
   try {
-    const res = await fetch('/api/signup', {
+    const { signup } = await request('/signups', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name,
-        phone: form.phone,
-        province: form.province,
-        activityType: form.activityType
-      })
+      body: {
+        tier_id: props.tierId,
+        contact_name: form.contact_name,
+        contact_phone: form.contact_phone
+      }
     })
-    const data = await res.json()
-    if (res.ok && data.ok) {
-      successLabel.value = typeOptions.find(t => t.id === form.activityType)?.label || ''
-      success.value = true
-    } else if (data.errors) {
-      if (data.errors.name) errors.name = data.errors.name
-      if (data.errors.phone) errors.phone = data.errors.phone
-      if (data.errors.province) errors.province = data.errors.province
-      if (data.errors.activityType) errors.activityType = data.errors.activityType
-    } else {
-      serverError.value = data.message || '报名失败，请稍后重试'
+    emit('success', signup)
+  } catch (err) {
+    if (err.details) {
+      if (err.details.contact_name) errors.contact_name = err.details.contact_name
+      if (err.details.contact_phone) errors.contact_phone = err.details.contact_phone
     }
-  } catch {
-    serverError.value = '网络异常，请检查网络后重试'
+    serverError.value = err.message
   } finally {
     submitting.value = false
   }
 }
-
-function reset() {
-  form.name = ''
-  form.phone = ''
-  success.value = false
-}
 </script>
 
 <style scoped>
-.form-item {
-  margin-bottom: 16px;
-}
-
+.form-item { margin-bottom: 16px; }
 .label {
   display: block;
   font-size: 14px;
@@ -168,7 +122,6 @@ function reset() {
   color: #7f2917;
   margin-bottom: 8px;
 }
-
 .input {
   width: 100%;
   height: 46px;
@@ -179,62 +132,10 @@ function reset() {
   font-size: 15px;
   color: #3d1d0d;
   outline: none;
-  transition: border-color .15s;
 }
-
-.input:focus {
-  border-color: #d05a4e;
-}
-
-.input::placeholder {
-  color: #c9b8a3;
-}
-
-.select {
-  appearance: none;
-  padding-right: 36px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b39b83' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-color: #fff;
-}
-
-.select:invalid {
-  color: #c9b8a3;
-}
-
-.error {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #d0342c;
-}
-
-.type-group {
-  display: flex;
-  gap: 12px;
-}
-
-.type-item {
-  flex: 1;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid #e8d5bd;
-  border-radius: 10px;
-  background: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  color: #8a6a4f;
-  transition: all .15s;
-}
-
-.type-item.active {
-  border-color: #b91c1c;
-  background: #fdeeed;
-  color: #b91c1c;
-}
-
+.input:focus { border-color: #d05a4e; }
+.input::placeholder { color: #c9b8a3; }
+.error { margin-top: 6px; font-size: 12px; color: #d0342c; }
 .server-error {
   margin-bottom: 12px;
   padding: 10px 12px;
@@ -244,7 +145,6 @@ function reset() {
   font-size: 13px;
   color: #c0261f;
 }
-
 .submit-btn {
   width: 100%;
   height: 50px;
@@ -255,48 +155,42 @@ function reset() {
   font-weight: 700;
   letter-spacing: 4px;
   box-shadow: 0 6px 16px rgba(185, 28, 28, .35);
-  transition: transform .15s, opacity .15s;
 }
-
-.submit-btn:active {
-  transform: scale(.98);
-}
-
-.submit-btn:disabled {
-  opacity: .6;
-}
-
+.submit-btn:disabled { opacity: .6; }
 .agree-tip {
   margin-top: 12px;
   text-align: center;
   font-size: 11px;
   color: #b39b83;
 }
-
-.success-box {
-  text-align: center;
-  padding: 18px 0 6px;
-}
-
-.success-icon {
-  font-size: 52px;
-}
-
+.success-box { text-align: center; padding: 8px 0 6px; }
+.success-icon { font-size: 52px; }
 .success-title {
   margin-top: 10px;
   font-size: 21px;
   font-weight: 800;
   color: #b91c1c;
 }
-
-.success-desc {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #8a6a4f;
-  line-height: 1.7;
+.voucher {
+  margin-top: 14px;
+  background: #fff;
+  border: 1px dashed #e0a98f;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
 }
-
+.voucher-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #8a6a4f;
+  line-height: 2.1;
+}
+.voucher-row b { color: #5c2a17; font-weight: 700; }
+.status-pending { color: #c77716; }
+.status-done { color: #1f8a4c; }
 .again-btn {
+  display: inline-block;
   margin-top: 18px;
   padding: 10px 32px;
   border-radius: 22px;

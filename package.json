@@ -1,7 +1,7 @@
 {
-  "name": "newyear-2027-h5",
+  "name": "double11-activity-h5",
   "version": "1.0.0",
-  "description": "2027元旦活动H5页面（消费满200送50，满300送100）",
+  "description": "双十一活动 H5 页面（C 端：活动浏览、登录报名、我的报名）",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.21"
+    "pinia": "^4.1.0",
+    "vue": "^3.4.21",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
