@@ -1,0 +1,64 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+  background: #8f0f0f;
+  color: #3d1d0d;
+  min-height: 100%;
+}
+
+#app {
+  max-width: 750px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #b91c1c 0%, #a01414 40%, #7f1010 100%);
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+}
+
+input, select {
+  font-family: inherit;
+}
+
+.section {
+  margin: 16px 14px;
+  background: #fff9ef;
+  border-radius: 16px;
+  padding: 20px 16px;
+  box-shadow: 0 6px 18px rgba(80, 8, 8, 0.25);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #b91c1c;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+.section-title::before,
+.section-title::after {
+  content: "";
+  width: 28px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e6b25c);
+  border-radius: 1px;
+}
+
+.section-title::after {
+  background: linear-gradient(90deg, #e6b25c, transparent);
+}
